@@ -246,6 +246,7 @@ class Tapper {
     let access_token_created_time = 0;
 
     let profile_data;
+    let position;
     let parsed_tg_web_data;
     let tasks;
     let tasks_daily;
@@ -300,16 +301,20 @@ class Tapper {
         tasks = await this.api.get_tasks(http_client, false);
         tasks_daily = await this.api.get_tasks(http_client, true);
         /* referrals = await this.api.get_referrals(http_client);
+         */
         position = await this.api.get_position(
           http_client,
           parsed_tg_web_data?.user?.id
-        ); */
-
-        if (_.isEmpty(profile_data)) {
+        );
+        if (_.isEmpty(profile_data) || _.isEmpty(position)) {
           access_token_created_time = 0;
           continue;
         }
         await sleep(2);
+
+        logger.info(
+          `<ye>[${this.bot_name}]</ye> | ${this.session_name} | Total Rating: <gr>${profile_data?.rating}</gr> | Position: <la>${position?.position}</la>`
+        );
 
         if (settings.CLAIM_DAILY_REWARDS && sleep_reward < currentTime) {
           const check_joined_major_channel =

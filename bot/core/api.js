@@ -1,7 +1,5 @@
-const FormData = require("form-data");
 const app = require("../config/app");
 const logger = require("../utils/logger");
-const sleep = require("../utils/sleep");
 var _ = require("lodash");
 
 class ApiRequest {
@@ -17,6 +15,9 @@ class ApiRequest {
       );
       return response?.data;
     } catch (error) {
+      if (error?.response?.status >= 500 && error?.response?.status <= 599) {
+        return null;
+      }
       if (error?.response?.data?.message) {
         logger.warning(
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ⚠️ Error while getting user info: ${error?.response?.data?.message}`
@@ -38,6 +39,9 @@ class ApiRequest {
       );
       return response.data;
     } catch (error) {
+      if (error?.response?.status >= 500 && error?.response?.status <= 599) {
+        return null;
+      }
       if (error?.response?.data?.message) {
         logger.warning(
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ⚠️ Error while <b>getting position:</b>: ${error?.response?.data?.message}`
@@ -59,6 +63,9 @@ class ApiRequest {
       );
       return response.data;
     } catch (error) {
+      if (error?.response?.status >= 500 && error?.response?.status <= 599) {
+        return null;
+      }
       if (error?.response?.data?.message) {
         logger.warning(
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ⚠️ Error while <b>getting visit streak:</b> ${error?.response?.data?.message}`
@@ -80,6 +87,9 @@ class ApiRequest {
       );
       return response.data;
     } catch (error) {
+      if (error?.response?.status >= 500 && error?.response?.status <= 599) {
+        return null;
+      }
       if (error?.response?.data?.message) {
         logger.warning(
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ⚠️ Error while <b>getting referrals:</b> ${error?.response?.data?.message}`
@@ -101,6 +111,9 @@ class ApiRequest {
       );
       return response.data;
     } catch (error) {
+      if (error?.response?.status >= 500 && error?.response?.status <= 599) {
+        return null;
+      }
       if (error?.response?.data?.message) {
         logger.warning(
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ⚠️ Error while <b>getting tasks:</b> ${error?.response?.data?.message}`
@@ -122,6 +135,9 @@ class ApiRequest {
       );
       return response.data;
     } catch (error) {
+      if (error?.response?.status >= 500 && error?.response?.status <= 599) {
+        return null;
+      }
       if (error?.response?.data?.message) {
         logger.warning(
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ⚠️ Error while <b>getting bonus:</b> ${error?.response?.data?.message}`
@@ -143,6 +159,9 @@ class ApiRequest {
       );
       return response.data;
     } catch (error) {
+      if (error?.response?.status >= 500 && error?.response?.status <= 599) {
+        return null;
+      }
       if (error?.response?.data?.message) {
         logger.warning(
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ⚠️ Error while <b>claiming visit:</b> ${error?.response?.data?.message}`
@@ -169,6 +188,9 @@ class ApiRequest {
         return error?.response?.data;
       }
 
+      if (error?.response?.status >= 500 && error?.response?.status <= 599) {
+        return null;
+      }
       if (error?.response?.data?.message) {
         logger.warning(
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ⚠️ Error while <b>claiming visit:</b> ${error?.response?.data?.message}`
@@ -227,6 +249,9 @@ class ApiRequest {
         return error?.response?.data;
       }
 
+      if (error?.response?.status >= 500 && error?.response?.status <= 599) {
+        return null;
+      }
       if (error?.response?.data?.message) {
         logger.warning(
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ⚠️ Error while <b>claiming bonus:</b> ${error?.response?.data?.message}`
@@ -248,6 +273,9 @@ class ApiRequest {
     } catch (error) {
       if (error?.response?.status == 400 && error?.response?.data?.detail) {
         return error?.response?.data;
+      }
+      if (error?.response?.status >= 500 && error?.response?.status <= 599) {
+        return null;
       }
       if (error?.response?.data?.message) {
         logger.warning(
