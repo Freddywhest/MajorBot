@@ -155,6 +155,12 @@ class Tapper {
       };
       return json;
     } catch (error) {
+      if (error.message.includes("AUTH_KEY_DUPLICATED")) {
+        logger.error(
+          `<ye>[${this.bot_name}]</ye> | ${this.session_name} | The same authorization key (session file) was used in more than one place simultaneously. You must delete your session file and create a new session`
+        );
+        return null;
+      }
       const regex = /A wait of (\d+) seconds/;
       if (
         error.message.includes("FloodWaitError") ||
@@ -180,11 +186,11 @@ class Tapper {
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ❗️Unknown error during Authorization: ${error}`
         );
       }
-      throw error;
+      return null;
     } finally {
-      if (this.tg_client.connected) {
+      /* if (this.tg_client.connected) {
         await this.tg_client.destroy();
-      }
+      } */
       await sleep(1);
       if (!this.runOnce) {
         logger.info(
@@ -246,7 +252,6 @@ class Tapper {
     let access_token_created_time = 0;
 
     let profile_data;
-    let position;
     let parsed_tg_web_data;
     let tasks;
     let tasks_daily;
@@ -279,6 +284,14 @@ class Tapper {
         const currentTime = _.floor(Date.now() / 1000);
         if (currentTime - access_token_created_time >= 1800) {
           const tg_web_data = await this.#get_tg_web_data();
+          if (
+            _.isNull(tg_web_data) ||
+            _.isUndefined(tg_web_data) ||
+            !tg_web_data ||
+            _.isEmpty(tg_web_data)
+          ) {
+            continue;
+          }
           access_token = await this.#get_access_token(tg_web_data, http_client);
           http_client.defaults.headers["authorization"] = `${
             access_token?.token_type ? access_token?.token_type : "Bearer"
@@ -301,20 +314,16 @@ class Tapper {
         tasks = await this.api.get_tasks(http_client, false);
         tasks_daily = await this.api.get_tasks(http_client, true);
         /* referrals = await this.api.get_referrals(http_client);
-         */
         position = await this.api.get_position(
           http_client,
           parsed_tg_web_data?.user?.id
-        );
-        if (_.isEmpty(profile_data) || _.isEmpty(position)) {
+        ); */
+
+        if (_.isEmpty(profile_data)) {
           access_token_created_time = 0;
           continue;
         }
         await sleep(2);
-
-        logger.info(
-          `<ye>[${this.bot_name}]</ye> | ${this.session_name} | Total Rating: <gr>${profile_data?.rating}</gr> | Position: <la>${position?.position}</la>`
-        );
 
         if (settings.CLAIM_DAILY_REWARDS && sleep_reward < currentTime) {
           const check_joined_major_channel =
@@ -435,9 +444,9 @@ class Tapper {
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ❗️Unknown error: ${error}`
         );
       } finally {
-        if (this.tg_client.connected) {
+        /* if (this.tg_client.connected) {
           await this.tg_client.destroy();
-        }
+        } */
         logger.info(
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | 😴 sleeping for ${settings.SLEEP_BETWEEN_REQUESTS} seconds...`
         );

@@ -1,4 +1,6 @@
+var _ = require("lodash");
 function taskFilter(tasks, query_name) {
+  if (_.isEmpty(tasks)) return [];
   return tasks.filter((task) => {
     if (typeof query_name == "string") {
       return (
