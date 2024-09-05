@@ -26,6 +26,7 @@
 | **API_ID / API_HASH**      | Platform data from which to launch a Telegram session (stock - Android)   |
 | **AUTO_PLAY_ROULETTE**     | Whether the bot should play roulette (True / False)                       |
 | **AUTO_PLAY_HOLD_TO_EARN** | Whether the bot should play hold to earn (True / False)                   |
+| **AUTO_PLAY_SWIPE_COIN**   | Whether the bot should play swipe (True / False)                          |
 | **AUTO_CLAIM_TASKS**       | Whether the bot claim tasks (True / False)                                |
 | **CLAIM_DAILY_REWARDS**    | Whether the bot claim daily rewards (True / False)                        |
 | **SLEEP_BETWEEN_REQUESTS** | Delay between taps in seconds (eg. 70)                                    |
