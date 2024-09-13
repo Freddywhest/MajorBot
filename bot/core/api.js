@@ -215,6 +215,31 @@ class ApiRequest {
     }
   }
 
+  async validate_query_id(http_client, data) {
+    try {
+      const response = await http_client.post(
+        `${app.apiUrl}/api/auth/tg/`,
+        JSON.stringify(data)
+      );
+
+      if (!_.isEmpty(response?.data)) {
+        return true;
+      }
+      return false;
+    } catch (error) {
+      if (
+        error?.response?.data?.message
+          ?.toLowerCase()
+          ?.includes("invalid init data signature") ||
+        error?.response?.status == 401
+      ) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
   async claim_visit(http_client) {
     try {
       const response = await http_client.post(

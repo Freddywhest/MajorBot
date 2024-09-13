@@ -2,7 +2,7 @@ const { default: axios } = require("axios");
 const logger = require("../utils/logger");
 const headers = require("./header");
 const { Api } = require("telegram");
-const { SocksProxyAgent } = require("socks-proxy-agent");
+const { HttpsProxyAgent } = require("https-proxy-agent");
 const settings = require("../config/config");
 const app = require("../config/app");
 const user_agents = require("../config/userAgents");
@@ -14,6 +14,8 @@ const parser = require("../utils/parser");
 const path = require("path");
 const taskFilter = require("../utils/taskFilter");
 const _isArray = require("../utils/_isArray");
+const FdyTmp = require("fdy-tmp");
+const Fetchers = require("../utils/fetchers");
 
 class Tapper {
   constructor(tg_client) {
@@ -95,11 +97,11 @@ class Tapper {
       if (!proxy) return null;
       let proxy_url;
       if (!proxy.password && !proxy.username) {
-        proxy_url = `socks${proxy.socksType}://${proxy.ip}:${proxy.port}`;
+        proxy_url = `${proxy.protocol}://${proxy.ip}:${proxy.port}`;
       } else {
-        proxy_url = `socks${proxy.socksType}://${proxy.username}:${proxy.password}@${proxy.ip}:${proxy.port}`;
+        proxy_url = `${proxy.protocol}://${proxy.username}:${proxy.password}@${proxy.ip}:${proxy.port}`;
       }
-      return new SocksProxyAgent(proxy_url);
+      return new HttpsProxyAgent(proxy_url);
     } catch (e) {
       logger.error(
         `<ye>[${this.bot_name}]</ye> | ${
@@ -112,15 +114,54 @@ class Tapper {
 
   async #get_tg_web_data() {
     try {
+      const tmp = new FdyTmp({
+        fileName: `${this.bot_name}.fdy.tmp`,
+        tmpPath: path.join(process.cwd(), "cache/queries"),
+      });
+      if (tmp.hasJsonElement(this.session_name)) {
+        const queryStringFromCache = tmp.getJson(this.session_name);
+        if (!_.isEmpty(queryStringFromCache)) {
+          const jsonData = {
+            init_data: queryStringFromCache,
+          };
+
+          const va_hc = axios.create({
+            headers: this.headers,
+            withCredentials: true,
+          });
+
+          const validate = await this.api.validate_query_id(va_hc, jsonData);
+
+          if (validate) {
+            logger.info(
+              `<ye>[${this.bot_name}]</ye> | ${this.session_name} | 🔄 Getting data from cache...`
+            );
+            if (this.tg_client.connected) {
+              await this.tg_client.disconnect();
+              await this.tg_client.destroy();
+            }
+            await sleep(5);
+            return jsonData;
+          } else {
+            tmp.deleteJsonElement(this.session_name);
+          }
+        }
+      }
+      await this.tg_client.connect();
       await this.tg_client.start();
       const platform = this.#get_platform(this.#get_user_agent());
+
+      if (!this.bot) {
+        this.bot = await this.tg_client.getInputEntity(app.bot);
+      }
+
       if (!this.runOnce) {
         logger.info(
           `<ye>[${this.bot_name}]</ye> | ${this.session_name} | 📡 Waiting for authorization...`
         );
         const botHistory = await this.tg_client.invoke(
           new Api.messages.GetHistory({
-            peer: await this.tg_client.getInputEntity(app.bot),
+            peer: this.bot,
             limit: 10,
           })
         );
@@ -130,29 +171,40 @@ class Tapper {
               message: "/start",
               silent: true,
               noWebpage: true,
-              peer: await this.tg_client.getInputEntity(app.peer),
+              peer: this.bot,
             })
           );
         }
       }
+
+      await sleep(5);
+
       const result = await this.tg_client.invoke(
         new Api.messages.RequestWebView({
-          peer: await this.tg_client.getInputEntity(app.peer),
-          bot: await this.tg_client.getInputEntity(app.bot),
+          peer: this.bot,
+          bot: this.bot,
           platform,
-          from_bot_menu: false,
+          from_bot_menu: true,
           url: app.webviewUrl,
-          startParam: "VSLNu6frT0NF3Vw1",
         })
       );
+
       const authUrl = result.url;
       const tgWebData = authUrl.split("#", 2)[1];
-      const data = parser.toJson(
-        decodeURIComponent(this.#clean_tg_web_data(tgWebData))
+      logger.info(
+        `<ye>[${this.bot_name}]</ye> | ${this.session_name} | 💾 Storing data in cache...`
       );
 
+      await sleep(5);
+
+      tmp
+        .addJson(
+          this.session_name,
+          decodeURIComponent(this.#clean_tg_web_data(tgWebData))
+        )
+        .save();
       const json = {
-        init_data: parser.toQueryString(data),
+        init_data: decodeURIComponent(this.#clean_tg_web_data(tgWebData)),
       };
       return json;
     } catch (error) {
@@ -189,62 +241,16 @@ class Tapper {
       }
       return null;
     } finally {
-      /* if (this.tg_client.connected) {
+      if (this.tg_client.connected) {
+        await this.tg_client.disconnect();
         await this.tg_client.destroy();
-      } */
-      await sleep(1);
-      if (!this.runOnce) {
-        logger.info(
-          `<ye>[${this.bot_name}]</ye> | ${this.session_name} | 🚀 Starting session...`
-        );
       }
-
       this.runOnce = true;
-    }
-  }
-
-  async #get_access_token(tgWebData, http_client) {
-    try {
-      const response = await http_client.post(
-        `${app.apiUrl}/api/auth/tg/`,
-        JSON.stringify(tgWebData)
-      );
-
-      return response.data;
-    } catch (error) {
-      logger.error(
-        `<ye>[${this.bot_name}]</ye> | ${this.session_name} | ❗️Unknown error while getting Access Token: ${error}`
-      );
-      await sleep(3); // 3 seconds delay
-    }
-  }
-
-  async #check_proxy(http_client, proxy) {
-    try {
-      const response = await http_client.get("https://httpbin.org/ip");
-      const ip = response.data.origin;
-      logger.info(
-        `<ye>[${this.bot_name}]</ye> | ${this.session_name} | Proxy IP: ${ip}`
-      );
-    } catch (error) {
-      if (
-        error.message.includes("ENOTFOUND") ||
-        error.message.includes("getaddrinfo") ||
-        error.message.includes("ECONNREFUSED")
-      ) {
-        logger.error(
-          `<ye>[${this.bot_name}]</ye> | ${this.session_name} | Error: Unable to resolve the proxy address. The proxy server at ${proxy.ip}:${proxy.port} could not be found. Please check the proxy address and your network connection.`
-        );
-        logger.error(
-          `<ye>[${this.bot_name}]</ye> | ${this.session_name} | No proxy will be used.`
-        );
-      } else {
-        logger.error(
-          `<ye>[${this.bot_name}]</ye> | ${this.session_name} | Proxy: ${proxy.ip}:${proxy.port} | Error: ${error.message}`
-        );
+      if (this.sleep_floodwait > new Date().getTime() / 1000) {
+        await sleep(this.sleep_floodwait - new Date().getTime() / 1000);
+        return await this.#get_tg_web_data();
       }
-
-      return false;
+      await sleep(3);
     }
   }
 
@@ -263,13 +269,15 @@ class Tapper {
     let sleep_reward = 0;
     let access_token;
 
+    const fetchers = new Fetchers(this.api, this.session_name, this.bot_name);
+
     if (settings.USE_PROXY_FROM_FILE && proxy) {
       http_client = axios.create({
         httpsAgent: this.#proxy_agent(proxy),
         headers: this.headers,
         withCredentials: true,
       });
-      const proxy_result = await this.#check_proxy(http_client, proxy);
+      const proxy_result = await fetchers.check_proxy(http_client, proxy);
       if (!proxy_result) {
         http_client = axios.create({
           headers: this.headers,
@@ -295,7 +303,10 @@ class Tapper {
           ) {
             continue;
           }
-          access_token = await this.#get_access_token(tg_web_data, http_client);
+          access_token = await fetchers.get_access_token(
+            tg_web_data,
+            http_client
+          );
           http_client.defaults.headers["authorization"] = `${
             access_token?.token_type ? access_token?.token_type : "Bearer"
           } ${access_token?.access_token}`;
@@ -456,7 +467,6 @@ class Tapper {
         if (settings.AUTO_PLAY_SWIPE_COIN && sleep_swipe < currentTime) {
           const coins = _.random(200, 300);
           const get_swipe = await this.api.get_swipe(http_client);
-          console.log(JSON.stringify(get_swipe, null, 2));
 
           if (!_.isEmpty(get_swipe) && get_swipe?.success == true) {
             const result = await this.api.claim_swipe(http_client, coins);
